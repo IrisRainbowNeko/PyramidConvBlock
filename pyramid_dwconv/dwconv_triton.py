@@ -279,7 +279,7 @@ def example_usage():
 
 if __name__ == "__main__":
     # 使用案例测试
-    batch_size = 32
+    batch_size = 1
     height = 64
     width = 64
     channels = 1152
