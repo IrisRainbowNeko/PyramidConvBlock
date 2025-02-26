@@ -403,14 +403,11 @@ class OptimizedDepthwiseConv2d(torch.nn.Module):
         self.dilation = dilation
         
         # 设置默认数据类型，支持fp16和bf16
-        if dtype is None:
-            self.dtype = torch.float16
-        else:
-            self.dtype = dtype
+        dtype = torch.float16
         
         # 初始化权重
         self.weight = torch.nn.Parameter(
-            torch.empty(kernel_size[0], kernel_size[1], channels, dtype=self.dtype)
+            torch.empty(kernel_size[0], kernel_size[1], channels, dtype=dtype)
         )
         torch.nn.init.kaiming_uniform_(self.weight)
         
@@ -421,7 +418,7 @@ class OptimizedDepthwiseConv2d(torch.nn.Module):
         return DepthwiseConv2DFunction.apply(
             x, self.weight, 
             self.stride, self.padding, self.dilation,
-            self.dtype
+            self.weight.dtype
         )
 
 
@@ -502,7 +499,7 @@ def benchmark(batch_size=8, height=224, width=224, channels=64, kernel_size=13, 
     max_diff = torch.max(torch.abs(out_triton - out_torch))
     print(f"最大绝对误差: {max_diff.item()}")
 
-    grad = torch.randn_like(out_triton)*0.1
+    grad = torch.randn_like(out_triton)
     torch.autograd.backward(out_triton, grad)
     torch.autograd.backward(out_torch, grad)
 
