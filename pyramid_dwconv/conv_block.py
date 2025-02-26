@@ -107,9 +107,13 @@ def benchmark(batch_size=8, height=224, width=224, channels=64, kernel_size=13, 
         dim=channels,
         kernel_size=kernel_size,
     ).cuda().to(dtype)
+
+    out_triton = conv_triton(x)
+    grad = torch.randn_like(out_triton)
     
     # 创建PyTorch的实现（需要转换为BCHW格式）
     x_torch = x.permute(0, 3, 1, 2).clone()  # BHWC -> BCHW
+    grad_torch = grad.permute(0, 3, 1, 2)
     conv_torch = ConvBlockT(
         dim=channels,
         kernel_size=kernel_size,
@@ -120,9 +124,9 @@ def benchmark(batch_size=8, height=224, width=224, channels=64, kernel_size=13, 
     # 预热
     for _ in range(10):
         y1 = conv_triton(x)
-        #y1.mean().backward()
+        torch.autograd.backward(y1, grad)
         y2 = conv_torch(x_torch)
-        #y2.mean().backward()
+        torch.autograd.backward(y2, grad_torch)
     
     torch.cuda.synchronize()
     
@@ -131,7 +135,7 @@ def benchmark(batch_size=8, height=224, width=224, channels=64, kernel_size=13, 
     start = time.time()
     for _ in range(iterations):
         y = conv_triton(x)
-        #y.mean().backward()
+        torch.autograd.backward(y, grad)
     torch.cuda.synchronize()
     triton_time = (time.time() - start) / iterations
     
@@ -139,7 +143,7 @@ def benchmark(batch_size=8, height=224, width=224, channels=64, kernel_size=13, 
     start = time.time()
     for _ in range(iterations):
         y = conv_torch(x_torch)
-        #y.mean().backward()
+        torch.autograd.backward(y, grad_torch)
     torch.cuda.synchronize()
     torch_time = (time.time() - start) / iterations
     
