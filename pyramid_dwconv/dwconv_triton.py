@@ -250,13 +250,17 @@ def _depthwise_conv_weight_grad_kernel(
     batch_offset = pid_batch * height * width * channels
 
     # 输入数据加载（带空间掩码）
+    ch_mask = (h_center >= 0) & (h_center < height)
+    cw_mask = (w_center >= 0) & (w_center < width)
+    cspace_mask = ch_mask[:, None] & cw_mask[None, :]  # 逻辑运算+广播加速
+
     in_ptrs = (
         batch_offset + 
         (h_center[:, None, None] * width * channels) + 
         (w_center[None, :, None] * channels) + 
         (c_start + tl.arange(0, BLOCK_C)[None, None, :])
     )
-    inputs = tl.load(input_ptr + in_ptrs, mask=c_mask[None, None, :], other=0.0)
+    inputs = tl.load(input_ptr + in_ptrs, mask=cspace_mask[:, :, None] &c_mask[None, None, :], other=0.0)
     
     # 卷积核循环展开，加速运算（支持任意尺寸卷积核）
     for kh in range(kernel_h):
